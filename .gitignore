@@ -1,0 +1,32 @@
+# Secrets — NEVER commit
+.env
+.env.local
+.env.*.local
+
+# Personal Claude Code overrides — stay local, never share
+.claude/settings.local.json
+
+# Audit logs — operational data, not source
+audit/
+*.jsonl
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Language-specific build / cache artefacts
+__pycache__/
+*.pyc
+node_modules/
+dist/
+build/
+.pytest_cache/
+.cache/
+
+# Test outputs — regenerate, don't commit
+test-output/
+coverage/
