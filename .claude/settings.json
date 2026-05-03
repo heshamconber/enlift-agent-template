@@ -1,21 +1,28 @@
 {
   "$comment": "Enlift Agent Template — permissions baseline. DO NOT loosen these without team review. Personal overrides go in .claude/settings.local.json (gitignored).",
   "permissions": {
-    "defaultMode": "default",
+    "defaultMode": "deny",
     "allow": [
-      "Read",
+      "Read(./*)",
+      "Read(./docs/*)",
+      "Read(./tests/*)",
+      "Read(./.claude/*)",
       "Grep",
       "Glob",
       "Bash(git status)",
       "Bash(git diff *)",
       "Bash(git log *)",
       "Bash(git branch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
       "Bash(npm test *)",
       "Bash(npm run lint *)",
       "Bash(pytest *)",
-      "Bash(ls *)",
-      "Bash(cat *)",
-      "Bash(echo *)"
+      "Bash(ls ./*)",
+      "Bash(python3 .claude/skills/mask-pii/scripts/mask.py *)",
+      "Bash(python3 .claude/skills/audit-log/scripts/log.py *)",
+      "Bash(date *)"
     ],
     "deny": [
       "Read(./.env)",
@@ -25,6 +32,7 @@
       "Read(~/.config/**)",
       "Bash(rm -rf *)",
       "Bash(rm -r *)",
+      "Bash(rm * audit*)",
       "Bash(sudo *)",
       "Bash(curl *)",
       "Bash(wget *)",
@@ -33,10 +41,15 @@
       "Bash(npm publish *)",
       "Bash(git push --force *)",
       "Bash(git push -f *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean -f *)",
+      "Bash(git rebase *)",
       "Write(./.env)",
       "Write(./.env.*)",
-      "Write(./production.*)"
+      "Write(./production.*)",
+      "Write(./audit/*)"
     ]
   },
-  "$note": "Enlift baseline rationale: Read/Grep/Glob are safe defaults. Git is read-only by default; commits and pushes require explicit approval. Bash is denied for anything that touches credentials, makes network calls, or destroys data. To request a new allowed tool, open a PR and document why in your CLAUDE.md."
+  "$note": "Enlift baseline: defaultMode=deny means every tool not listed here is blocked. Read is scoped to the project directory. Git write ops (add/commit/push) are allowed for normal dev workflow; destructive ops (force push, hard reset, rebase) are denied. Bash(cat) and Bash(echo) are intentionally absent — use the Read tool and the audit/mask scripts instead.",
+  "$extensions": "To add external tools for your agent (MCP servers, CLI tools, APIs), add them to the allow list in a PR and document the justification in your CLAUDE.md. Examples: 'mcp__atlassian__*', 'mcp__slack__*', 'Bash(python3 src/*.py)', 'Bash(node src/index.js)'"
 }

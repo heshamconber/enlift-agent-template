@@ -24,10 +24,10 @@
 
 **Project structure**:
 ```
-src/        — agent logic
-docs/       — spec, success criteria, runbook
+src/        — your agent's scripts and helpers (add scripts here, then allow them in settings.json)
+docs/       — runbook (one file — fill this in before building)
 tests/      — eval cases (minimum 5)
-.claude/    — skills, commands, permissions
+.claude/    — skills, commands, permissions (don't edit unless adding a new skill or tool)
 ```
 
 **Commands you'll need**:
@@ -35,6 +35,21 @@ tests/      — eval cases (minimum 5)
 - Run lint: `<command>`
 - Run a single eval case: `<command>`
 - Run the full eval suite: `<command>`
+
+---
+
+## Which rules apply to your agent?
+
+| Rule | Client-facing agent | Internal-only agent |
+|------|--------------------|--------------------|
+| PII masking | **Required** | Only if inputs contain personal data |
+| Audit logging | **Required** | Recommended but can be lightweight |
+| Multi-tenant isolation | **Required** | Not applicable — skip this rule |
+| Self-verification | **Required** | **Required** |
+| Deny-by-default permissions | **Required** | **Required** |
+
+**Client-facing** = agent reads tickets, emails, documents, or any data that belongs to a client.
+**Internal-only** = agent works purely with your own team's data (Jira backlog, internal reports, code).
 
 ---
 
@@ -46,11 +61,12 @@ tests/      — eval cases (minimum 5)
 - Never log raw PII. The audit log records hashes/redacted versions only.
 - If you see actual names, emails, phone numbers, or IDs in your context, stop and call `/enlift-mask`.
 
-### 2. Multi-tenant isolation
+### 2. Multi-tenant isolation *(client-facing agents only)*
 
 - This agent works on data from **one client at a time**. Never mix.
 - Client identity is established at session start. Verify before any action.
 - If you cannot determine which client a piece of data belongs to, **stop and ask the operator**.
+- *Internal-only agents: skip this rule — delete this section when you fill in CLAUDE.md.*
 
 ### 3. Self-verification before output
 
@@ -107,9 +123,8 @@ Before starting, convert vague requests into a concrete, verifiable success crit
 
 Every change must:
 1. Pass the eval suite in `tests/eval_cases.md` (target: pass^5 ≥ 80% — agent succeeds on all 5 attempts in ≥80% of trials)
-2. Update `docs/SUCCESS_CRITERIA.md` if behaviour changes
-3. Update `docs/RUNBOOK.md` if operational steps change
-4. Pass `docs/DEFINITION_OF_DONE.md` before shipping
+2. Update `docs/RUNBOOK.md` if behaviour or operational steps change
+3. Pass the ship checklist in `docs/RUNBOOK.md` before shipping
 
 ---
 

@@ -18,8 +18,6 @@ This template enforces five non-negotiable components every Enlift agent must ha
 4. **Self-verification step** — the agent reviews its own output before returning it
 5. **Success criteria + eval cases** — written *before* coding, gated *before* shipping
 
-If your agent does not have all five, it is not production-ready. See `docs/DEFINITION_OF_DONE.md`.
-
 ---
 
 ## Quick start
@@ -30,17 +28,20 @@ git clone <enlift-agent-template-url> my-new-agent
 cd my-new-agent
 rm -rf .git && git init
 
-# 2. Fill out the spec BEFORE writing any code
-$EDITOR docs/SPEC.md
+# 2. Fill out the runbook BEFORE writing any code
+$EDITOR docs/RUNBOOK.md
 
-# 3. Define what "done" looks like
-$EDITOR docs/SUCCESS_CRITERIA.md
+# 3. Fill in your eval cases
 $EDITOR tests/eval_cases.md
 
 # 4. Customise CLAUDE.md for this specific agent
 $EDITOR CLAUDE.md
 
-# 5. Launch Claude Code
+# 5. Set up secrets and the audit directory
+cp .env.example .env && $EDITOR .env
+mkdir -p audit && chmod 750 audit
+
+# 6. Launch Claude Code
 claude
 ```
 
@@ -48,21 +49,20 @@ claude
 
 ## What's in this repo
 
-| Path | What it is | Editable? |
-|---|---|---|
-| `CLAUDE.md` | Project memory loaded at every session start | Yes — fill it in |
-| `.claude/settings.json` | Permissions baseline (deny-by-default) | **No** — use `.claude/settings.local.json` for personal overrides |
-| `.claude/commands/` | Standard slash commands shared across all Enlift agents | Yes — add your own |
-| `.claude/skills/mask-pii/` | Mandatory PII masking skill | **No** — required, do not remove |
-| `.claude/skills/audit-log/` | Mandatory audit logging skill | **No** — required, do not remove |
-| `.claude/skills/verify-output/` | Mandatory self-verification skill | **No** — required, do not remove |
-| `docs/SPEC.md` | What this agent does — fill in *before* coding | Yes — required |
-| `docs/SUCCESS_CRITERIA.md` | How we know it works | Yes — required |
-| `docs/RUNBOOK.md` | How to operate this agent in production | Yes — required |
-| `docs/DEFINITION_OF_DONE.md` | The gate — every agent must pass | **No** — read it, conform to it |
-| `tests/eval_cases.md` | Scenarios this agent must pass | Yes — minimum 5 cases |
-| `.env.example` | Template for secrets — never commit real `.env` | Yes |
-| `.gitignore` | Pre-configured to keep secrets and local state out of git | Yes — extend, don't shrink |
+| Path | What it is |
+|---|---|
+| `CLAUDE.md` | Project memory — fill in before building |
+| `src/` | Your agent's scripts and helpers — put custom code here |
+| `docs/RUNBOOK.md` | Everything in one place: spec, success criteria, how to run, ship checklist |
+| `tests/eval_cases.md` | Scenarios the agent must pass — minimum 5 |
+| `.claude/settings.json` | Deny-by-default permissions baseline — extend, don't weaken |
+| `.claude/skills/mask-pii/` | Mandatory PII masking (includes `scripts/mask.py`) |
+| `.claude/skills/audit-log/` | Mandatory audit logging (includes `scripts/log.py`) |
+| `.claude/skills/verify-output/` | Mandatory self-verification |
+| `.claude/commands/` | Shared slash commands |
+| `.env.example` | Secrets template — copy to `.env`, never commit `.env` |
+| `.mcp.json.example` | MCP server config template |
+| `.gitignore` | Pre-configured — extend, don't shrink |
 
 ---
 
@@ -73,15 +73,18 @@ claude
 | Agent repo name | `enlift-<domain>-<verb>` | `enlift-ops-handbook-creator` |
 | Skill name | `kebab-case`, verb-first | `mask-pii`, `lookup-jira` |
 | Slash command (shared) | `/enlift-<action>` | `/enlift-verify` |
-| Slash command (personal) | `/<action>` | `/refactor` |
-| File names | lowercase, hyphenated, no spaces | `client-isolation.md` |
 
 ---
 
-## Before you ship
+## Adding external tools
 
-Run through `docs/DEFINITION_OF_DONE.md`. Every box must be checked. No exceptions.
+Each derived agent adds the specific tools it needs. To add an MCP server or CLI tool:
+
+1. Add to `.mcp.json` (use `.mcp.json.example` as reference)
+2. Add the scoped allow rule to `.claude/settings.json`
+3. Document in `docs/RUNBOOK.md` — Tools & Skills table
+4. Review in PR before merging
 
 ---
 
-*Maintained by the Enlift AI team. Questions: ask in #ai-agents Slack channel.*
+*Maintained by the Enlift AI team. Questions: #ai-agents Slack channel.*
