@@ -23,6 +23,14 @@ import re
 import secrets
 import sys
 
+# Optional NER-based masking via presidio (covers PERSON, ORG, LOCATION, etc.).
+# Falls back to regex-only if presidio or the spaCy model is not installed.
+try:
+    from presidio_analyzer import AnalyzerEngine as _AnalyzerEngine
+    _presidio = _AnalyzerEngine()
+except Exception:
+    _presidio = None
+
 # Per-session salt — in memory only, never logged or persisted
 _SESSION_SALT = secrets.token_hex(16)
 
@@ -36,6 +44,9 @@ _PATTERNS = [
         r"\b\d{3}-\d{2}-\d{4}\b"                             # US SSN
         r"|\b\d{2}/\d{6}/\d\b"                               # AU TFN (loose)
     )),
+    ("UKNIN", re.compile(
+        r"\b[A-CEGHJ-PR-TW-Z]{2}\d{6}[A-D]\b"               # UK National Insurance Number
+    )),
     ("EMAIL", re.compile(
         r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
     )),
@@ -43,10 +54,17 @@ _PATTERNS = [
         r"\+?1?\s?[\(\-]?\d{3}[\)\-\s]?\s?\d{3}[\-\s]?\d{4}"  # NANP
         r"|\+?\d[\d\s\-\(\)]{6,}\d"                             # international (loose)
     )),
+    ("IPADDR", re.compile(
+        r"\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b"
+    )),
 ]
 
 # Verification pass — catches survivors
 _VERIFY_PATTERNS = [p for _, p in _PATTERNS]
+
+# Note: PERSON name detection via regex produces high false-positive rates.
+# Derived agents processing named individuals should add a NLP library
+# (e.g. spacy with en_core_web_sm) for entity recognition alongside these patterns.
 
 
 def _token(label: str, value: str) -> str:
@@ -54,7 +72,27 @@ def _token(label: str, value: str) -> str:
     return f"[{label}_{digest}]"
 
 
+def _presidio_mask(text: str) -> str:
+    """NER pass for PERSON, ORG, LOCATION, and other high-recall entity types.
+
+    Applied before regex patterns so that named entities are masked before
+    regex patterns run (avoids partial matches on already-masked tokens).
+    Returns text unchanged if presidio is not installed.
+    """
+    if _presidio is None:
+        return text
+    try:
+        results = _presidio.analyze(text=text, language="en")
+        for r in sorted(results, key=lambda x: x.start, reverse=True):
+            token = _token(r.entity_type, text[r.start:r.end])
+            text = text[:r.start] + token + text[r.end:]
+    except Exception:
+        pass
+    return text
+
+
 def mask(text: str) -> str:
+    text = _presidio_mask(text)
     for label, pattern in _PATTERNS:
         text = pattern.sub(lambda m: _token(label, m.group()), text)
     return text

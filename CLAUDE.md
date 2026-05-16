@@ -60,6 +60,7 @@ tests/      — eval cases (minimum 5)
 - **Always** invoke the `mask-pii` skill before sending external content (tickets, emails, documents) to the model.
 - Never log raw PII. The audit log records hashes/redacted versions only.
 - If you see actual names, emails, phone numbers, or IDs in your context, stop and call `/enlift-mask`.
+- For client-facing agents processing external content, wire an LLM injection classifier at startup via `set_llm_injection_classifier()` in `src/preflight.py` — regex-only mode is not sufficient for production client-facing use.
 
 ### 2. Multi-tenant isolation *(client-facing agents only)*
 
@@ -79,6 +80,7 @@ tests/      — eval cases (minimum 5)
 - Every run is logged via the `audit-log` skill.
 - Log entries include: timestamp, operator, client context, tools invoked, success/failure.
 - The audit log is append-only. Never modify or delete entries.
+- Pass `tokens_used=llm_client._tokens_used` to `require_audit_then_return()` so token consumption is recorded — never leave it at the default 0.
 
 ### 5. Permissions
 

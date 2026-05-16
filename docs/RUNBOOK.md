@@ -49,6 +49,21 @@
 
 ---
 
+## LLM Provider
+
+Fill this in before going to production. Required for infosec sign-off.
+
+| Field | Value |
+|-------|-------|
+| Provider | <e.g. Anthropic (claude.ai) / Azure AI Foundry / on-premise> |
+| API endpoint | <URL> |
+| Data used for training | <Yes / No / Opt-out confirmed — check provider DPA> |
+| Data residency region | <e.g. US-East, EU-West> |
+| Infosec approval | <Name, date> |
+| Data processing agreement | <Link or "N/A"> |
+
+---
+
 ## Threat model
 
 | Threat | Likelihood | Mitigation |
@@ -131,6 +146,7 @@ claude "process this: $(cat masked-input.txt)"
 | `pii_mask_failure` in audit log | Masking patterns miss new PII format | **Halt the agent.** Page <owner>. |
 | Audit log has gaps | Disk full or permission error | **Halt the agent.** No audit = not allowed to run. |
 | pass^5 drops below 80% | Model, prompt, or input drift | Halt; run eval suite; check upstream changes |
+| API key > 90 days old | Scheduled rotation missed | Rotate immediately; update `.env` and record date |
 
 ---
 
@@ -161,6 +177,30 @@ Before this agent goes to production, every box must be checked:
 
 ---
 
+## Kill Switch (< 60 s)
+
+If the agent must be taken offline immediately:
+
+1. Kill the claude process: `pkill -f "claude"` (Linux/Mac) or end the process in Task Manager (Windows)
+2. Revoke the `ANTHROPIC_API_KEY` at the Anthropic console → API Keys → Revoke
+3. Revoke any MCP connector tokens listed in `.env` (see revocation URLs in `.env.example`)
+4. Archive the audit log: `cp -r audit/ /secure/incident-$(date +%Y-%m-%d)/`
+5. Notify `<security lead>` by **phone** — not Slack
+6. Do not restart the agent without a security review
+
+---
+
+## Incident Response
+
+| Phase | Action |
+|-------|--------|
+| **Detect** | Audit log gap, `pii_mask_failure` event, `Verification: FAIL` twice, unexpected tool call in log |
+| **Contain** | Execute Kill Switch above; revoke credentials; isolate audit log |
+| **Eradicate** | Identify root cause (injection, misconfig, compromised dep); patch before restart |
+| **Recover** | Re-run eval suite (pass^5 ≥ 80%); get security lead sign-off; re-enable in prod |
+
+---
+
 ## Adding a new external tool or MCP connector
 
 1. Add the server to `.mcp.json` (use `.mcp.json.example` as reference)
@@ -174,7 +214,9 @@ Before this agent goes to production, every box must be checked:
 
 1. Set Status above to "Deprecated"
 2. Disable any scheduled runs
-3. Preserve audit logs for the contractually required retention period
+3. Preserve audit logs for **12 months** (or the contractually required period if longer).
+   After the retention period: `find audit/ -name "*.jsonl" -mtime +365 -delete`
+   In production, configure a lifecycle policy on the blob/S3 bucket to expire objects after 365 days.
 4. Move repo to `archive/` org with a final commit explaining why
 
 ---
