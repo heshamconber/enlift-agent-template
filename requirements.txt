@@ -1,5 +1,5 @@
 # Pin ALL packages with ==. Derived agents: add your deps here.
-pytest==8.3.5
+pytest==9.0.3
 # PII masking — NER-based PERSON/LOCATION/ORG detection
 # After installing, run: python -m spacy download en_core_web_sm
 presidio-analyzer==2.2.354
