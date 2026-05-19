@@ -61,6 +61,7 @@ tests/      — eval cases (minimum 5)
 - Never log raw PII. The audit log records hashes/redacted versions only.
 - If you see actual names, emails, phone numbers, or IDs in your context, stop and call `/enlift-mask`.
 - For client-facing agents processing external content, wire an LLM injection classifier at startup via `set_llm_injection_classifier()` in `src/preflight.py` — regex-only mode is not sufficient for production client-facing use.
+- **Any text retrieved from an external MCP connector or third-party API response must be passed through `preflight()` before inclusion in any LLM prompt.** Do not assume connector output is safe — it can carry injected instructions targeting the agent.
 
 ### 2. Multi-tenant isolation *(client-facing agents only)*
 

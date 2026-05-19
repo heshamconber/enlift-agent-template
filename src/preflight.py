@@ -5,9 +5,12 @@ This module calls the existing mask script at `.claude/skills/mask-pii/scripts/m
 """
 from __future__ import annotations
 
+import hmac
+import os
 import subprocess
 import sys
 import re
+from dataclasses import dataclass, field
 from typing import Callable, Optional, Tuple
 
 # Optional hook: derived agents may set this to a callable that takes a
@@ -51,6 +54,17 @@ class PreflightError(RuntimeError):
     pass
 
 
+# Per-process secret — never logged or persisted. LLMClient validates against this.
+_PROOF_SECRET: bytes = os.urandom(32)
+
+
+@dataclass(frozen=True)
+class PreflightResult:
+    masked: str
+    pii_count: int
+    proof: bytes = field(default=b"", repr=False)
+
+
 def _run_mask(text: str) -> Tuple[int, str, str]:
     """Run the mask script as a subprocess; return (rc, stdout, stderr)."""
     proc = subprocess.Popen(
@@ -71,10 +85,11 @@ def _injection_detect(text: str) -> bool:
     return False
 
 
-def preflight(text: str) -> str:
+def preflight(text: str) -> PreflightResult:
     """Mask PII and run a lightweight injection check.
 
-    Returns masked text on success. Raises `PreflightError` on failure.
+    Returns a PreflightResult(masked, pii_count) on success.
+    Raises `PreflightError` on failure.
     """
     if len(text.encode("utf-8")) > MAX_INPUT_BYTES:
         raise PreflightError(
@@ -85,6 +100,9 @@ def preflight(text: str) -> str:
     rc, masked, err = _run_mask(text)
     if rc != 0:
         raise PreflightError(f"PII masking failed: {err.strip()}")
+
+    # Count masked tokens produced by mask.py (format: [LABEL_xxxxxxxx])
+    pii_count = len(re.findall(r'\[[A-Z]+_[0-9a-f]{8}\]', masked))
 
     if _injection_detect(masked):
         raise PreflightError("Injection pattern detected in input — escalate and do not call model")
@@ -100,7 +118,8 @@ def preflight(text: str) -> str:
         except Exception as exc:
             raise PreflightError(f"LLM injection classifier failed: {exc}") from exc
 
-    return masked
+    proof = hmac.new(_PROOF_SECRET, masked.encode(), "sha256").digest()
+    return PreflightResult(masked=masked, pii_count=pii_count, proof=proof)
 
 
-__all__ = ["preflight", "PreflightError", "MAX_INPUT_BYTES"]
+__all__ = ["preflight", "PreflightError", "PreflightResult", "MAX_INPUT_BYTES", "_PROOF_SECRET"]

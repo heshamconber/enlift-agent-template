@@ -51,16 +51,22 @@
 
 ## LLM Provider
 
-Fill this in before going to production. Required for infosec sign-off.
+**Required before any external (client) data is processed.** Get infosec sign-off and record it here.
 
 | Field | Value |
 |-------|-------|
-| Provider | <e.g. Anthropic (claude.ai) / Azure AI Foundry / on-premise> |
-| API endpoint | <URL> |
-| Data used for training | <Yes / No / Opt-out confirmed — check provider DPA> |
-| Data residency region | <e.g. US-East, EU-West> |
-| Infosec approval | <Name, date> |
-| Data processing agreement | <Link or "N/A"> |
+| Provider | <FILL_IN: e.g. "Anthropic (claude.ai/code)" or "Azure AI Foundry" or "on-premise"> |
+| API endpoint | <FILL_IN: e.g. "https://api.anthropic.com" or your Azure endpoint URL> |
+| Data used for training | <FILL_IN: "No — confirmed via DPA" or "Opt-out enabled — link below"> |
+| Data residency region | <FILL_IN: e.g. "US-East" or "EU-West" — check your provider's DPA> |
+| Infosec approval | <FILL_IN: "Approved by FULL_NAME on YYYY-MM-DD"> |
+| Data processing agreement | <FILL_IN: Link to signed DPA or "N/A — self-hosted"> |
+
+> **How to complete this table:**
+> 1. Confirm the provider's DPA covers your client data jurisdiction.
+> 2. If using Anthropic's claude.ai API: log in to console.anthropic.com → Privacy → confirm opt-out of training is enabled for your org.
+> 3. Send the completed table to your infosec/legal lead for written approval before first production run.
+> 4. Replace all `FILL_IN:` prefixes above with real values.
 
 ---
 
@@ -168,12 +174,15 @@ Before this agent goes to production, every box must be checked:
 
 ## Escalation
 
+> **Before shipping**: replace every `FILL_IN` below with real names and contact details.
+> Test the escalation path with at least one practice escalation before production.
+
 | Trigger | Who | How |
 |---|---|---|
-| Agent halted itself | <owner> | Slack DM + #ai-agents |
-| Suspected PII leak | <security lead> | Phone immediately — not Slack |
-| Suspected prompt injection | <security lead> + <owner> | Phone immediately |
-| Eval regression | <owner> | Slack within 1 working day |
+| Agent halted itself | <FILL_IN: Agent owner name + Slack handle> | Slack DM + #ai-agents |
+| Suspected PII leak | <FILL_IN: Security lead name + direct phone> | Phone immediately — not Slack |
+| Suspected prompt injection | <FILL_IN: Security lead + agent owner> | Phone immediately |
+| Eval regression | <FILL_IN: Agent owner name + Slack handle> | Slack within 1 working day |
 
 ---
 
@@ -185,7 +194,7 @@ If the agent must be taken offline immediately:
 2. Revoke the `ANTHROPIC_API_KEY` at the Anthropic console → API Keys → Revoke
 3. Revoke any MCP connector tokens listed in `.env` (see revocation URLs in `.env.example`)
 4. Archive the audit log: `cp -r audit/ /secure/incident-$(date +%Y-%m-%d)/`
-5. Notify `<security lead>` by **phone** — not Slack
+5. Notify <FILL_IN: security lead name + phone number> by **phone** — not Slack
 6. Do not restart the agent without a security review
 
 ---
@@ -207,6 +216,50 @@ If the agent must be taken offline immediately:
 2. Add the tool to `.claude/settings.json` allowlist with a scoped pattern
 3. Add a row to the Tools & Skills table above
 4. Run the eval suite to confirm no regression
+
+---
+
+## Alerting Setup
+
+Configure `ALERT_WEBHOOK_URL` in the runtime environment to receive security alerts:
+
+```bash
+# Example: Slack incoming webhook
+ALERT_WEBHOOK_URL=https://hooks.slack.com/services/FILL_IN/FILL_IN/FILL_IN
+```
+
+The audit logger fires a webhook POST for: `pii_mask_failure`, `escalation`, `permission_denied`, and any `outcome=failure` event.
+
+**Verification (run once in staging before production):**
+
+```bash
+# Trigger a test alert manually
+ALERT_WEBHOOK_URL=<your-webhook> python3 .claude/skills/audit-log/scripts/log.py \
+  --event-type pii_mask_failure --outcome failure \
+  --notes "Staging alert test" --agent enlift-test
+# Confirm alert appears in your monitoring channel
+```
+
+---
+
+## Audit Log Retention
+
+Audit logs must be retained for **12 months** minimum (extend if contractually required).
+
+**Production setup** — configure a lifecycle policy on your blob/S3 bucket:
+
+| Platform | How |
+|----------|-----|
+| AWS S3 | Add a lifecycle rule: expire objects with prefix `*.jsonl` after 365 days |
+| Azure Blob | Set `daysAfterModificationGreaterThan: 365` in lifecycle management policy |
+| GCS | Add a lifecycle rule: `age: 365` on the audit bucket |
+
+**Manual cleanup (dev only):**
+```bash
+find audit/ -name "*.jsonl" -mtime +365 -delete
+```
+
+Record the lifecycle policy ARN/URL here once configured: `FILL_IN: <policy ARN or URL>`
 
 ---
 

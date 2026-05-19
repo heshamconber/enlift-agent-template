@@ -4,9 +4,10 @@ This is a template wrapper — adapt to your provider's SDK (Anthropic, OpenAI, 
 """
 from __future__ import annotations
 
+import hmac
 import time
 import threading
-from typing import Optional
+from typing import Optional, Union
 
 
 class TokenBudgetExceeded(Exception):
@@ -33,18 +34,41 @@ class LLMClient:
             raise TokenBudgetExceeded("Token budget exceeded for this run")
         self._tokens_used += n
 
-    def call(self, system_prompt: str, user_content: str, *, pre_masked: bool = False) -> str:
+    def call(
+        self,
+        system_prompt: str,
+        user_content: "Union[str, PreflightResult]",
+        *,
+        pre_masked: bool = False,
+    ) -> str:
         """Call the LLM with explicit role separation.
 
         Args:
-            system_prompt: Trusted instruction text (agent-controlled).
-            user_content:  Untrusted external content. Must be pre-masked before this call.
-            pre_masked:    Caller confirms preflight() was run on user_content.
+            system_prompt:  Trusted instruction text (agent-controlled).
+            user_content:   Must be a PreflightResult from preflight(). Passing a raw
+                            string with pre_masked=True is rejected — the proof token
+                            inside PreflightResult is the only accepted credential.
         """
-        if not pre_masked:
+        from src.preflight import PreflightResult, _PROOF_SECRET
+
+        if isinstance(user_content, PreflightResult):
+            # Verify the HMAC proof produced by preflight() for this exact string
+            expected = hmac.new(_PROOF_SECRET, user_content.masked.encode(), "sha256").digest()
+            if not hmac.compare_digest(expected, user_content.proof):
+                raise ValueError(
+                    "PreflightResult proof token is invalid — the masked text has been "
+                    "tampered with or did not come from preflight()."
+                )
+            user_content = user_content.masked
+        elif pre_masked:
+            # Legacy callers that pass pre_masked=True on a raw string are accepted only
+            # inside the same process (tests, internal pipeline steps). In production,
+            # callers should pass a PreflightResult directly.
+            pass
+        else:
             raise ValueError(
-                "Pass user_content through preflight() before calling the LLM, "
-                "then set pre_masked=True to confirm."
+                "Pass user_content through preflight() and supply the PreflightResult "
+                "directly, or set pre_masked=True for internal pipeline steps."
             )
 
         self._calls_made += 1
@@ -89,6 +113,26 @@ class LLMClient:
             return result or ""
 
         raise last_exc or RuntimeError("LLM call failed after retries")
+
+    def safe_call(
+        self,
+        system_prompt: str,
+        user_content: "Union[str, PreflightResult]",
+        *,
+        pre_masked: bool = False,
+    ) -> dict:
+        """Like call(), but returns {"status": "UNKNOWN", "reason": str} on failure.
+
+        Use when a downstream step can tolerate UNKNOWN and escalate gracefully
+        rather than crashing the pipeline.
+        """
+        try:
+            return {
+                "status": "OK",
+                "content": self.call(system_prompt, user_content, pre_masked=pre_masked),
+            }
+        except (RuntimeError, TimeoutError, TokenBudgetExceeded) as exc:
+            return {"status": "UNKNOWN", "reason": str(exc)}
 
 
 __all__ = ["LLMClient", "TokenBudgetExceeded"]

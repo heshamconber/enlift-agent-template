@@ -13,15 +13,14 @@
       "Bash(git diff *)",
       "Bash(git log *)",
       "Bash(git branch *)",
-      "Bash(git add *)",
-      "Bash(git commit *)",
-      "Bash(git push *)",
       "Bash(npm test *)",
       "Bash(npm run lint *)",
       "Bash(pytest *)",
       "Bash(ls ./*)",
       "Bash(python3 .claude/skills/mask-pii/scripts/mask.py *)",
       "Bash(python3 .claude/skills/audit-log/scripts/log.py *)",
+      "Bash(python3 src/main.py *)",
+      "Bash(python3 -m src.main *)",
       "Bash(date *)"
     ],
     "deny": [
@@ -39,6 +38,9 @@
       "Bash(ssh *)",
       "Bash(scp *)",
       "Bash(npm publish *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
       "Bash(git push --force *)",
       "Bash(git push -f *)",
       "Bash(git reset --hard *)",
@@ -50,6 +52,6 @@
       "Write(./audit/*)"
     ]
   },
-  "$note": "Enlift baseline: defaultMode=deny means every tool not listed here is blocked. Read is scoped to the project directory. Git write ops (add/commit/push) are allowed for normal dev workflow; destructive ops (force push, hard reset, rebase) are denied. Bash(cat) and Bash(echo) are intentionally absent — use the Read tool and the audit/mask scripts instead.",
+  "$note": "Enlift baseline: defaultMode=deny means every tool not listed here is blocked. Read is scoped to the project directory. Git write ops (add/commit/push) are NOT in the baseline — an injection-hijacked agent must not be able to exfiltrate data via git. Derived agents that genuinely need git write access must add these permissions explicitly with a documented justification. Destructive ops (force push, hard reset, rebase) remain denied.",
   "$extensions": "To add external tools for your agent (MCP servers, CLI tools, APIs), add them to the allow list in a PR and document the justification in your CLAUDE.md. Examples: 'mcp__atlassian__*', 'mcp__slack__*', 'Bash(python3 src/*.py)', 'Bash(node src/index.js)'"
 }

@@ -28,7 +28,16 @@ import sys
 try:
     from presidio_analyzer import AnalyzerEngine as _AnalyzerEngine
     _presidio = _AnalyzerEngine()
-except Exception:
+except Exception as _presidio_err:
+    if os.environ.get("ENLIFT_ENV") in ("production", "staging"):
+        print(
+            f"[mask-pii] CRITICAL: Presidio NER engine unavailable: {_presidio_err}\n"
+            "[mask-pii] PERSON, ORG, LOCATION names will not be masked.\n"
+            "[mask-pii] Install presidio and spaCy model: "
+            "pip install presidio-analyzer && python -m spacy download en_core_web_sm",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     _presidio = None
 
 # Per-session salt — in memory only, never logged or persisted
@@ -62,9 +71,12 @@ _PATTERNS = [
 # Verification pass — catches survivors
 _VERIFY_PATTERNS = [p for _, p in _PATTERNS]
 
-# Note: PERSON name detection via regex produces high false-positive rates.
-# Derived agents processing named individuals should add a NLP library
-# (e.g. spacy with en_core_web_sm) for entity recognition alongside these patterns.
+# JURISDICTION COVERAGE:
+# Covered (regex):  US SSN, NANP phone, IBAN, AU TFN (loose), UK NIN, IP address, credit card
+# Covered (presidio): PERSON, ORG, LOCATION, EMAIL, PHONE (when presidio is installed)
+# NOT covered without presidio: EU national IDs (FR INSEE/NIR, NL BSN, DE Personalausweis),
+#   Canadian SIN, person/org names, location names.
+# Derived agents processing EU client data MUST install presidio (see requirements.txt).
 
 
 def _token(label: str, value: str) -> str:

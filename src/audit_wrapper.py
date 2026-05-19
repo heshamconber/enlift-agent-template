@@ -45,6 +45,7 @@ def write_final_audit(
     client_context: str = "<unknown>",
     outcome: str = "success",
     tokens_used: int = 0,
+    pii_count: int = 0,
 ) -> None:
     cmd = [
         sys.executable,
@@ -56,6 +57,7 @@ def write_final_audit(
         "--outcome", outcome,
         "--run-id", RUN_ID,
         "--tokens-used", str(tokens_used),
+        "--pii-count", str(pii_count),
     ]
     # If audit write fails, raise to prevent leaking output without a record
     subprocess.check_call(cmd)
@@ -68,6 +70,7 @@ def require_audit_then_return(
     operator: str = "<unknown>",
     client_context: str = "<unknown>",
     tokens_used: int = 0,
+    pii_count: int = 0,
 ) -> str:
     if _output_has_pii(payload):
         subprocess.call([
@@ -89,6 +92,7 @@ def require_audit_then_return(
         client_context=client_context,
         outcome="success",
         tokens_used=tokens_used,
+        pii_count=pii_count,
     )
     return payload
 
